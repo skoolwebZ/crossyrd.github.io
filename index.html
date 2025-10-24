@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Crossy Road</title>
+<style>
+  body { margin: 0; overflow: hidden; background: #87ceeb; font-family: sans-serif; }
+  canvas { display: block; margin: 0 auto; background: #87ceeb; }
+</style>
+</head>
+<body>
+
+<audio id="bgMusic" loop>
+  <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg">
+</audio>
+<audio id="jumpSound">
+  <source src="https://freesound.org/data/previews/66/66717_931655-lq.mp3" type="audio/mpeg">
+</audio>
+<audio id="hitSound">
+  <source src="https://freesound.org/data/previews/156/156103_2730995-lq.mp3" type="audio/mpeg">
+</audio>
+<audio id="coinSound">
+  <source src="https://freesound.org/data/previews/341/341695_6241731-lq.mp3" type="audio/mpeg">
+</audio>
+<audio id="powerSound">
+  <source src="https://freesound.org/data/previews/331/331912_3248244-lq.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+// Canvas setup
+const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d');
+canvas.width = 500;
+canvas.height = 600;
+document.body.appendChild(canvas);
+
+// Sounds
+const bgMusic = document.getElementById('bgMusic'); bgMusic.volume = 0.3;
+const jumpSound = document.getElementById('jumpSound');
+const hitSound = document.getElementById('hitSound');
+const coinSound = document.getElementById('coinSound');
+const powerSound = document.getElementById('powerSound');
+
+// Load images
+const playerImg = new Image(); playerImg.src = 'https://i.imgur.com/OdL0XPt.png'; // frog
+const carImgs = [
+  'https://i.imgur.com/Jq0F3PM.png', 'https://i.imgur.com/Y4JZcZp.png', 'https://i.imgur.com/nf3JrOo.png'
+].map(src=>{const img=new Image(); img.src=src; return img;});
+const truckImg = new Image(); truckImg.src = 'https://i.imgur.com/k9tTtYZ.png';
+const busImg = new Image(); busImg.src = 'https://i.imgur.com/0Y5giyC.png';
+const logImgs = ['https://i.imgur.com/qxHnZBr.png','https://i.imgur.com/t3c2YQf.png'].map(src=>{const img=new Image(); img.src=src; return img;});
+const coinImg = new Image(); coinImg.src = 'https://i.imgur.com/XJc6QOe.png';
+const shieldImg = new Image(); shieldImg.src='https://i.imgur.com/6tDAGsT.png';
+const doubleImg = new Image(); doubleImg.src='https://i.imgur.com/HD4lZ8b.png';
+
+// Game variables
+const player = { x:225, y:550, width:30, height:30, targetX:225, targetY:550, shield:false, doublePoints:false };
+let score=0, gameOver=false, speedMultiplier=1;
+
+// Lanes setup
+const lanes = [
+  { y: 50, speed:2, type:0, cars:[] },
+  { y:100, speed:0, type:1, logs:[] },
+  { y:150, speed:2.5, type:0, cars:[] },
+  { y:200, speed:0, type:1, logs:[] },
+  { y:250, speed:3, type:0, cars:[] },
+  { y:300, speed:0, type:1, logs:[] },
+  { y:350, speed:3.5, type:0, cars:[] },
+  { y:400, speed:0, type:1, logs:[] }
+];
+
+// Coins and power-ups
+let coins=[], powerUps=[];
+
+// Spawn objects
+function spawnObjects(){
+  lanes.forEach(l=>{
+    if(l.type===0 && Math.random()<0.02*speedMultiplier){
+      const r=Math.random();
+      let img = carImgs[Math.floor(Math.random()*carImgs.length)];
+      if(r>0.85) img=truckImg;
+      else if(r>0.7) img=busImg;
+      l.cars.push({x:-50,y:l.y,img});
+    }
+    if(l.type===1 && Math.random()<0.01*speedMultiplier){
+      const img = logImgs[Math.floor(Math.random()*logImgs.length)];
+      l.logs.push({x:-100,y:l.y,img});
+    }
+  });
+  if(Math.random()<0.01) coins.push({x:Math.random()*450,y:50+Math.floor(Math.random()*500),width:20,height:20});
+  if(Math.random()<0.005){
+    const type=Math.random()<0.5?'shield':'double';
+    powerUps.push({x:Math.random()*450,y:50+Math.floor(Math.random()*500),width:25,height:25,type,color:type==='shield'?'cyan':'magenta',duration:500});
+  }
+}
+
+// Move objects
+function moveObjects(){
+  lanes.forEach(l=>{
+    if(l.type===0){
+      l.cars.forEach(c=>c.x+=l.speed*speedMultiplier);
+      l.cars=l.cars.filter(c=>c.x<canvas.width+100);
+    }else{
+      l.logs.forEach(lo=>lo.x+=(l.speed+1)*speedMultiplier);
+      l.logs=l.logs.filter(lo=>lo.x<canvas.width+150);
+    }
+  });
+}
+
+// Collision check
+function checkCollision(){
+  if(gameOver) return;
+  lanes.forEach(l=>{
+    if(l.type===0){
+      l.cars.forEach(c=>{
+        if(player.x<c.x+50 && player.x+30>c.x && player.y<c.y+30 && player.y+30>c.y){
+          if(!player.shield){ hitSound.play(); gameOver=true; setTimeout(resetGame,500); }
+          else player.shield=false;
+        }
+      });
+    }else{
+      const inLane=player.y>=l.y && player.y<l.y+30;
+      if(inLane){
+        let onLog=false;
+        l.logs.forEach(log=>{
+          if(player.x<log.x+100 && player.x+30>log.x){ onLog=true; player.targetX+=(l.speed+1)*speedMultiplier; }
+        });
+        if(!onLog){ if(!player.shield){ hitSound.play(); gameOver=true; setTimeout(resetGame,500); } else player.shield=false; }
+      }
+    }
+  });
+
+  coins=coins.filter(c=>{
+    if(player.x<c.x+20 && player.x+30>c.x && player.y<c.y+20 && player.y+30>c.y){ coinSound.play(); score+=player.doublePoints?10:5; return false; }
+    return true;
+  });
+
+  powerUps=powerUps.filter(p=>{
+    if(player.x<p.x+p.width && player.x+30>p.x && player.y<p.y+p.height && player.y+30>p.y){
+      powerSound.play(); if(p.type==='shield') player.shield=true; if(p.type==='double'){ player.doublePoints=true; setTimeout(()=>{player.doublePoints=false;},p.duration); } return false;
+    }
+    return true;
+  });
+}
+
+// Draw everything
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // lanes
+  lanes.forEach(l=>{ ctx.fillStyle=l.type===0?'#555':'#1e90ff'; ctx.fillRect(0,l.y,canvas.width,30); });
+
+  // cars/logs
+  lanes.forEach(l=>{
+    l.cars?.forEach(c=>ctx.drawImage(c.img,c.x,c.y,50,30));
+    l.logs?.forEach(lo=>ctx.drawImage(lo.img,lo.x,lo.y,100,30));
+  });
+
+  // coins
+  coins.forEach(c=>ctx.drawImage(coinImg,c.x,c.y,20,20));
+
+  // power-ups
+  powerUps.forEach(p=>{
+    ctx.drawImage(p.type==='shield'?shieldImg:doubleImg,p.x,p.y,p.width,p.height);
+  });
+
+  // player
+  ctx.drawImage(playerImg,player.x,player.y,30,30);
+  if(player.shield){ ctx.strokeStyle='cyan'; ctx.lineWidth=3; ctx.strokeRect(player.x-3,player.y-3,player.width+6,player.height+6); }
+
+  // score
+  ctx.fillStyle='black'; ctx.font='20px Arial'; ctx.fillText('Score: '+score,10,20);
+  ctx.fillText('Made by Josh J',canvas.width-120,canvas.height-10);
+}
+
+// Game loop
+function gameLoop(){ spawnObjects(); moveObjects(); movePlayer(); checkCollision(); draw(); requestAnimationFrame(gameLoop); }
+
+// Move player smoothly
+function movePlayer(){ const s=10; if(player.x<player.targetX)player.x+=s; if(player.x>player.targetX)player.x-=s; if(player.y<player.targetY)player.y+=s; if(player.y>player.targetY)player.y-=s; }
+
+// Controls
+document.addEventListener('keydown',e=>{
+  if(gameOver) return;
+  switch(e.key){
+    case 'ArrowUp': if(player.targetY>0){player.targetY-=50;score+=player.doublePoints?2:1;jumpSound.play();} break;
+    case 'ArrowDown': if(player.targetY<550){player.targetY+=50;jumpSound.play();} break;
+    case 'ArrowLeft': if(player.targetX>0){player.targetX-=50;jumpSound.play();} break;
+    case 'ArrowRight': if(player.targetX<470){player.targetX+=50;jumpSound.play();} break;
+  }
+});
+
+// Reset game
+function resetGame(){
+  player.x=225; player.y=550; player.targetX=225; player.targetY=550; score=0; gameOver=false; player.shield=false; player.doublePoints=false;
+  lanes.forEach(l=>{l.cars=[];l.logs=[];}); coins=[]; powerUps=[]; speedMultiplier=1;
+}
+
+// Difficulty increase
+setInterval(()=>{ speedMultiplier+=0.01; },1000);
+
+// Start
+bgMusic.play();
+gameLoop();
+</script>
+</body>
+</html>

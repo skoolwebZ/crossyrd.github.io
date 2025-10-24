@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Upgraded Crossy Road</title>
+<style>
+  body { margin: 0; overflow: hidden; background: #87ceeb; font-family: sans-serif; }
+  canvas { display: block; margin: 0 auto; background: #87ceeb; }
+</style>
+</head>
+<body>
+
+<audio id="bgMusic" loop>
+  <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg">
+</audio>
+<audio id="jumpSound">
+  <source src="https://freesound.org/data/previews/66/66717_931655-lq.mp3" type="audio/mpeg">
+</audio>
+<audio id="hitSound">
+  <source src="https://freesound.org/data/previews/156/156103_2730995-lq.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d');
+canvas.width = 500;
+canvas.height = 600;
+document.body.appendChild(canvas);
+
+const jumpSound = document.getElementById('jumpSound');
+const hitSound = document.getElementById('hitSound');
+const bgMusic = document.getElementById('bgMusic');
+
+const player = { x: 225, y: 550, width: 30, height: 30, color: 'green', targetX: 225, targetY: 550 };
+const lanes = [
+  { y: 100, speed: 2, cars: [] },
+  { y: 200, speed: 3, cars: [] },
+  { y: 300, speed: 2.5, cars: [] },
+  { y: 400, speed: 3.5, cars: [] }
+];
+
+const carTypes = [
+  { width: 50, height: 30, color: 'red' },
+  { width: 70, height: 30, color: 'blue' },
+  { width: 40, height: 30, color: 'yellow' }
+];
+
+let score = 0;
+
+// Smooth movement
+function movePlayer() {
+  const speed = 10;
+  if(player.x < player.targetX) player.x += speed;
+  if(player.x > player.targetX) player.x -= speed;
+  if(player.y < player.targetY) player.y += speed;
+  if(player.y > player.targetY) player.y -= speed;
+}
+
+// Spawn cars randomly
+function spawnCars() {
+  lanes.forEach(lane => {
+    if(Math.random() < 0.02) {
+      const type = carTypes[Math.floor(Math.random() * carTypes.length)];
+      lane.cars.push({ x: -type.width, y: lane.y, width: type.width, height: type.height, color: type.color });
+    }
+  });
+}
+
+// Move cars
+function moveCars() {
+  lanes.forEach(lane => {
+    lane.cars.forEach(car => car.x += lane.speed);
+    lane.cars = lane.cars.filter(car => car.x < canvas.width + 100);
+  });
+}
+
+// Check collisions
+function checkCollision() {
+  for(const lane of lanes) {
+    for(const car of lane.cars) {
+      if(player.x < car.x + car.width &&
+         player.x + player.width > car.x &&
+         player.y < car.y + car.height &&
+         player.y + player.height > car.y) {
+        hitSound.play();
+        alert('Game Over! Score: ' + score);
+        player.x = 225; player.y = 550; player.targetX = 225; player.targetY = 550;
+        score = 0;
+        lanes.forEach(l => l.cars = []);
+      }
+    }
+  }
+}
+
+// Draw everything
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw player
+  ctx.fillStyle = player.color;
+  ctx.fillRect(player.x, player.y, player.width, player.height);
+
+  // Draw cars
+  lanes.forEach(lane => {
+    lane.cars.forEach(car => {
+      ctx.fillStyle = car.color;
+      ctx.fillRect(car.x, car.y, car.width, car.height);
+    });
+  });
+
+  // Draw score
+  ctx.fillStyle = 'black';
+  ctx.font = '20px Arial';
+  ctx.fillText('Score: ' + score, 10, 20);
+}
+
+// Game loop
+function gameLoop() {
+  spawnCars();
+  moveCars();
+  movePlayer();
+  checkCollision();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+// Player controls
+document.addEventListener('keydown', e => {
+  switch(e.key) {
+    case 'ArrowUp':
+      if(player.targetY > 0){ player.targetY -= 50; score += 1; jumpSound.play(); }
+      if(player.targetY < 0){ player.targetY = 550; score += 5; } // cross top
+      break;
+    case 'ArrowDown':
+      if(player.targetY < 550){ player.targetY += 50; jumpSound.play(); }
+      break;
+    case 'ArrowLeft':
+      if(player.targetX > 0){ player.targetX -= 50; jumpSound.play(); }
+      break;
+    case 'ArrowRight':
+      if(player.targetX < 470){ player.targetX += 50; jumpSound.play(); }
+      break;
+  }
+});
+
+// Start music and game
+bgMusic.volume = 0.3;
+bgMusic.play();
+gameLoop();
+</script>
+</body>
+</html>
